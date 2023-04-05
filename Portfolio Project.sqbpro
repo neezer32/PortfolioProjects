@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><sqlb_project><db path="/Users/fts/Desktop/Google DA/Portfolio/Portfolio Project.db" readonly="0" foreign_keys="1" case_sensitive_like="0" temp_store="0" wal_autocheckpoint="1000" synchronous="2"/><attached/><window><main_tabs open="structure browser pragmas query" current="3"/></window><tab_structure><column_width id="0" width="300"/><column_width id="1" width="0"/><column_width id="2" width="100"/><column_width id="3" width="7030"/><column_width id="4" width="0"/><expanded_item id="0" parent="1"/><expanded_item id="1" parent="1"/><expanded_item id="2" parent="1"/><expanded_item id="0" parent="2"/><expanded_item id="3" parent="1"/></tab_structure><tab_browse><current_table name="4,11:mainCovidDeaths"/><default_encoding codec=""/><browse_table_settings><table schema="main" name="CovidDeaths" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_"><sort><column index="9" mode="0"/></sort><column_widths><column index="1" value="54"/><column index="2" value="57"/><column index="3" value="69"/><column index="4" value="72"/><column index="5" value="67"/><column index="6" value="68"/><column index="7" value="64"/><column index="8" value="122"/><column index="9" value="74"/><column index="10" value="70"/><column index="11" value="127"/><column index="12" value="132"/><column index="13" value="128"/><column index="14" value="186"/><column index="15" value="137"/><column index="16" value="134"/><column index="17" value="191"/><column index="18" value="102"/><column index="19" value="73"/><column index="20" value="136"/><column index="21" value="82"/><column index="22" value="146"/><column index="23" value="129"/><column index="24" value="193"/><column index="25" value="139"/><column index="26" value="203"/><column index="27" value="44"/><column index="28" value="45"/><column index="29" value="45"/><column index="30" value="45"/><column index="31" value="44"/><column index="32" value="45"/><column index="33" value="45"/><column index="34" value="45"/><column index="35" value="45"/><column index="36" value="45"/><column index="37" value="44"/><column index="38" value="45"/><column index="39" value="45"/><column index="40" value="45"/><column index="41" value="44"/><column index="42" value="45"/><column index="43" value="45"/><column index="44" value="45"/><column index="45" value="45"/><column index="46" value="45"/><column index="47" value="45"/><column index="48" value="46"/><column index="49" value="45"/><column index="50" value="45"/><column index="51" value="43"/><column index="52" value="45"/><column index="53" value="45"/><column index="54" value="45"/><column index="55" value="45"/><column index="56" value="45"/><column index="57" value="44"/><column index="58" value="45"/><column index="59" value="45"/><column index="60" value="45"/><column index="61" value="44"/><column index="62" value="45"/><column index="63" value="45"/><column index="64" value="45"/><column index="65" value="45"/><column index="66" value="45"/><column index="67" value="45"/><column index="68" value="45"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table></browse_table_settings></tab_browse><tab_sql><sql name="SQL 1">SELECT location, date, total_cases, new_cases, total_deaths, population
+FROM CovidDeaths
+ORDER BY 1,2
+
+-- Looking at Total Cases vs Total Deaths
+-- Show likelihood of dying if you contract COVID in your country
+
+SELECT location, date, total_cases, total_deaths, (total_deaths/total_cases)*100 as DeathPercentage
+FROM CovidDeaths
+WHERE location is &quot;United States&quot;
+ORDER BY 1,2
+
+-- Looking at Total Cases vs Population
+-- Shows what percentage of population got COVID
+
+SELECT location, date, total_cases, population, (total_cases/population)*100 as PercentPopulationInfected
+FROM CovidDeaths
+WHERE location is &quot;United States&quot;
+ORDER BY 1,2
+
+-- Looking at Countries with Highest Infection Rate vs Population
+
+SELECT location, population, MAX(total_cases) AS HighestInfectionCount, MAX((total_cases/population))*100 as PercentPopulationInfected
+FROM CovidDeaths
+--WHERE location is &quot;United States&quot;
+GROUP BY location, population
+ORDER BY PercentPopulationInfected DESC
+
+-- Showing Countries with Highest Death Count per Population
+
+SELECT location, MAX(cast(total_deaths as int)) as TotalDeathCount
+FROM CovidDeaths
+WHERE continent is not NULL
+GROUP BY location
+ORDER BY TotalDeathCount DESC
+
+
+
+-- LET'S BREAK THINGS DOWN BY CONTINENT 
+-- Showing continent with the highest death count per population
+
+SELECT continent, MAX(cast(total_deaths as int)) as TotalDeathCount
+FROM CovidDeaths
+WHERE continent is not NULL
+GROUP BY continent
+ORDER BY TotalDeathCount DESC
+
+
+-- Global Numbers
+
+SELECT date, SUM(new_cases) as total_cases, SUM(CAST(new_deaths as int)) as total_deaths, SUM(CAST(new_deaths as int))/SUM(new_cases)*100 AS DeathPercentage
+FROM CovidDeaths
+--WHERE location is &quot;United States&quot;
+WHERE continent is not NULL
+GROUP BY date
+ORDER BY 1,2
+
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CAST(new_vaccinations AS INT)) OVER (PARTITION BY dea.location ORDER BY dea.location, dea.date)  AS RollingPeopleVaccinated
+--, (RollingPeopleVaccinated/population)*100
+FROM CovidDeaths as dea
+JOIN CovidVaccinations as vac
+	ON dea.location = vac.location
+	AND dea.date = vac.date
+WHERE dea.continent is not NULL
+ORDER BY 2,3
+
+-- Use CTE
+
+WITH PopvsVac (Continent, Location, Date, Population,  New_Vaccinations, RollingPeopleVaccinated)
+AS
+(
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CAST(vac.new_vaccinations AS BIGINT)) OVER (PARTITION BY dea.location ORDER BY dea.location, dea.date)  AS RollingPeopleVaccinated
+--, (RollingPeopleVaccinated/population)*100
+FROM CovidDeaths as dea
+JOIN CovidVaccinations as vac
+	ON dea.location = vac.location
+	AND dea.date = vac.date
+WHERE dea.continent is not NULL
+--ORDER BY 2,3
+)
+SELECT *, (RollingPeopleVaccinated/population)*100
+FROM PopvsVac
+
+
+-- TEMP TABLE
+
+DROP TABLE IF exists #PercentPopulationVaccinated
+CREATE TABLE #PercentPopulationVaccinated
+(
+Continent nvarchar(255),
+Location nvarchar(255),
+Date datetime,
+Population numeric,
+New_vaccinations numeric,
+RollingPeopleVaccinated numeric
+)
+INSERT INTO #PercentPopulationVaccinated
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CAST(vac.new_vaccinations AS BIGINT)) OVER (PARTITION BY dea.location ORDER BY dea.location, dea.date)  AS RollingPeopleVaccinated
+--, (RollingPeopleVaccinated/population)*100
+FROM CovidDeaths as dea
+JOIN CovidVaccinations as vac
+	ON dea.location = vac.location
+	AND dea.date = vac.date
+WHERE dea.continent is not NULL
+--ORDER BY 2,3
+
+SELECT *, (RollingPeopleVaccinated/population)*100
+FROM #PercentPopulationVaccinated
+
+
+-- CREATING VIEW TO STORE DATA FOR LATER VISUALIZATIONS
+
+CREATE VIEW PercentPoplulationVaccinated as
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CAST(vac.new_vaccinations AS BIGINT)) OVER (PARTITION BY dea.location ORDER BY dea.location, dea.date)  AS RollingPeopleVaccinated
+--, (RollingPeopleVaccinated/population)*100
+FROM CovidDeaths as dea
+JOIN CovidVaccinations as vac
+	ON dea.location = vac.location
+	AND dea.date = vac.date
+WHERE dea.continent is not NULL
+--ORDER BY 2,3
+
+</sql><current_tab id="0"/></tab_sql></sqlb_project>
